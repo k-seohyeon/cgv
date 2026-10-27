@@ -1,0 +1,820 @@
+<title>CGV 재구축 프로토타입</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* ---- design plan -----------------------------------------------------
+     layout: single phone, one continuous realistic app flow
+     color:  --bg --surface --ink --sub --line --red
+     type:   display = Black Han Sans (CGV-style marquee), body = Noto Sans KR
+  ------------------------------------------------------------------------- */
+  :root{
+    --bg:#F3F1ED; --surface:#FFFFFF; --ink:#161412; --sub:#6B6660; --line:#E4E0D9;
+    --red:#E0142C; --surface-frame:#1C1A17;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#17140F; --surface:#211C16; --ink:#F4EFE7; --sub:#AEA69A; --line:#3A332A;
+      --red:#FF4457; --surface-frame:#000;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#17140F; --surface:#211C16; --ink:#F4EFE7; --sub:#AEA69A; --line:#3A332A;
+    --red:#FF4457; --surface-frame:#000;
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Noto Sans KR', sans-serif; }
+  .page{
+    padding-left:max(20px, env(safe-area-inset-left,0px));
+    padding-right:max(20px, env(safe-area-inset-right,0px));
+    padding-block: 50px;
+    max-width: 640px; margin: 0 auto;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+
+  button.dresetbtn{ margin-top:22px; font-family:inherit; font-size:12.5px; font-weight:700; color:var(--sub); background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:9px 18px; cursor:pointer; }
+  button.dresetbtn:hover{ color:var(--red); border-color:var(--red); }
+
+  .device{
+    width:320px; height:680px; border-radius:38px; background:#fff;
+    box-shadow: 0 1px 0 var(--line), 0 22px 44px -20px rgba(0,0,0,.42);
+    border: 8px solid var(--surface-frame);
+    overflow:hidden; position:relative;
+  }
+  .screen{ position:absolute; inset:0; display:none; flex-direction:column; background:#fff; }
+  .screen.on{ display:flex; }
+
+  .dstatus{ height:30px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; font-size:11.5px; font-weight:700; color:#161616; flex:0 0 auto; background:#fff;}
+  .dappbar{ height:44px; flex:0 0 auto; display:flex; align-items:center; padding:0 6px; position:relative; border-bottom:1px solid #ECECEC; background:#fff;}
+  .dappbar button.back{ width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:19px; color:#161616; background:none; border:0; cursor:pointer; border-radius:8px;}
+  .dappbar button.back:hover{ background:#F3F3F3; }
+  .dappbar .title{ position:absolute; left:0; right:0; text-align:center; font-size:14px; font-weight:800; color:#161616; pointer-events:none;}
+  .dappbar .logo{ font-family:'Black Han Sans', sans-serif; font-size:19px; letter-spacing:.5px; color:#E0142C; margin:0 auto;}
+  .dappbar .spacer{ width:30px; flex:0 0 auto; }
+  button.iconbtn{ width:30px; height:30px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; background:none; border:0; cursor:pointer; color:#161616; padding:0; }
+  button.iconbtn:hover{ background:#F3F3F3; border-radius:8px; }
+  .dcontent{ flex:1 1 auto; overflow:hidden; background:#fff; position:relative; }
+
+  .qbcard{ margin:12px 17px 0; border-radius:14px; overflow:hidden; border:1px solid #ECECEC; }
+  .qbcard .qbtop{ background:linear-gradient(120deg,#E0142C,#B8102A); padding:10px 14px; display:flex; align-items:center; justify-content:space-between; }
+  .qbcard .qbtop .t{ color:#fff; font-size:11.5px; font-weight:800; letter-spacing:.3px; }
+  .qbcard .qbtop .a{ color:#FFD2DA; font-size:9.5px; font-weight:700; }
+  .qbrow{ display:flex; }
+  .qbcell{ flex:1; padding:9px 10px; border-right:1px solid #ECECEC; }
+  .qbcell:last-child{ border-right:0; }
+  .qbcell .k{ font-size:7.8px; color:#9a9a9a; font-weight:700; margin-bottom:2px; }
+  .qbcell .v{ font-size:10.3px; color:#161616; font-weight:800; }
+  .dpad{ padding:14px 17px; }
+  .dsec-title{ font-size:13.5px; font-weight:800; color:#161616; margin-bottom:10px; display:flex; justify-content:space-between;}
+  .dsec-title .count{ font-size:10.5px; color:#8a8a8a; font-weight:500;}
+
+  .dgift{ border:1px solid #ECECEC; border-radius:12px; padding:12px 14px; margin-bottom:9px; display:flex; justify-content:space-between; align-items:center; background:#fff;}
+  .dgift .left{ display:flex; gap:10px; align-items:center;}
+  .dgicon{ width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#FFEAEE,#FFD2DA); display:flex; align-items:center; justify-content:center; color:#E0142C; font-size:13px; font-weight:800; flex:0 0 auto;}
+  .dgname{ font-size:12.5px; font-weight:800; color:#161616; margin-bottom:2px;}
+  .dgsub{ font-size:10px; color:#9a9a9a;}
+  .dgamt{ font-size:13.5px; font-weight:800; color:#161616;}
+  .dbadge{ display:inline-block; background:#FFF0F2; color:#E0142C; font-size:8.5px; font-weight:800; padding:1.5px 5px; border-radius:5px; margin-left:5px;}
+  .dnew{ display:inline-block; background:#E0142C; color:#fff; font-size:8px; font-weight:800; padding:1.5px 5px; border-radius:5px; margin-left:5px;}
+  .dusedbadge{ display:inline-block; background:#EDEDED; color:#9a9a9a; font-size:8px; font-weight:800; padding:1.5px 5px; border-radius:5px; margin-left:5px;}
+  .dgift.used{ opacity:.5; }
+  .dgift.used .dgamt{ text-decoration:line-through; color:#9a9a9a; }
+  .dhistcard{ border:1px solid #ECECEC; border-radius:12px; padding:13px 14px; margin-bottom:10px; }
+  .dhistcard .top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:7px; }
+  .dhistcard .top .name{ font-size:13px; font-weight:800; color:#161616; }
+  .dhistcard .top .badge{ font-size:8.5px; font-weight:800; color:#1B8A4C; background:#E8F8EE; padding:2px 7px; border-radius:6px; }
+  .dhistcard .meta{ font-size:10px; color:#9a9a9a; margin-bottom:8px; }
+  .dhistcard .row{ display:flex; justify-content:space-between; font-size:10.5px; color:#555; padding:2px 0; }
+  .dhistcard .row.total{ font-weight:800; color:#161616; font-size:12px; margin-top:4px; padding-top:7px; border-top:1px dashed #ECECEC; }
+  .demptyhist{ text-align:center; color:#9a9a9a; font-size:11.5px; padding:60px 20px; line-height:1.6; }
+
+  button.dadd{ width:100%; border:1.4px dashed #D9D9D9; border-radius:12px; padding:12px; text-align:center; color:#E0142C; font-weight:800; font-size:12.5px; background:#FAFAFA; cursor:pointer; font-family:inherit;}
+  .dinfo{ background:#F6F8FF; border-radius:10px; padding:11px 12px; font-size:10.6px; color:#3A4A7A; line-height:1.55; margin-top:12px;}
+  .dtoast{ background:#161616; color:#fff; border-radius:11px; padding:11px 13px; font-size:10.6px; display:none; gap:9px; align-items:flex-start; margin-bottom:12px; line-height:1.5;}
+  .dtoast.show{ display:flex; }
+  .dtoast .c{ width:17px; height:17px; border-radius:50%; background:#E0142C; color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
+
+  .dcta{ position:absolute; left:0; right:0; bottom:0; padding:11px 17px 17px; background:#fff; border-top:1px solid #ECECEC;}
+  button.dbtn{ width:100%; background:#E0142C; color:#fff; text-align:center; padding:14px; border-radius:11px; font-weight:800; font-size:13.5px; border:0; cursor:pointer; font-family:inherit;}
+  button.dbtn.disabled{ background:#F0B6BF; cursor:default; }
+  .dinput-label{ font-size:11px; color:#8a8a8a; margin-bottom:7px; font-weight:700;}
+  .dinput{ border:1.6px solid #E0142C; border-radius:11px; padding:14px; font-size:13.5px; color:#161616; letter-spacing:.5px; font-weight:700;}
+  .dhint{ font-size:10.2px; color:#8a8a8a; margin-top:9px; line-height:1.55;}
+  .dhint b{ color:#E0142C;}
+  .dcheck{ display:flex; gap:8px; align-items:flex-start; background:#F6F8FF; color:#2A3B6B; border-radius:10px; padding:11px 13px; font-size:10.4px; margin-top:14px; line-height:1.55;}
+  .dcheck .c{ width:17px; height:17px; border-radius:50%; background:#3A62E0; color:#fff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
+
+  .dmovie{ padding:14px 17px; border-bottom:7px solid #F5F5F5;}
+  .dmovie .name{ font-size:13.5px; font-weight:800; color:#161616; margin-bottom:3px;}
+  .dmovie .meta{ font-size:10.2px; color:#9a9a9a;}
+  .dprice{ display:flex; justify-content:space-between; align-items:center; padding:9px 17px;}
+  .dprice .label{ font-size:10.8px; color:#8a8a8a; font-weight:700;}
+  .dprice .value{ font-size:12px; font-weight:800; color:#161616;}
+  .dprice.total .value{ font-size:17px; font-weight:900; color:#E0142C;}
+  .dline{ height:1px; background:#ECECEC; margin:4px 17px;}
+
+  button.dselect{ text-align:left; font-family:inherit; border:1.4px solid #ECECEC; background:#fff; border-radius:12px; padding:12px 14px; margin:0 17px 8px; width:calc(100% - 34px); display:flex; align-items:center; gap:10px; cursor:pointer;}
+  button.dselect.active{ border-color:#E0142C; background:#FFF8F9;}
+  .dradio{ width:16px; height:16px; border-radius:50%; border:2px solid #D9D9D9; flex:0 0 auto;}
+  button.dselect.active .dradio{ border-color:#E0142C; background:radial-gradient(circle, #E0142C 0 5.5px, #fff 6px 16px);}
+  .dapplied{ margin:9px 17px 0; background:#FFF0F2; color:#E0142C; font-size:10.4px; font-weight:800; padding:10px 12px; border-radius:10px; line-height:1.55;}
+
+  .dpointrow{ display:flex; align-items:center; justify-content:space-between; gap:10px; border:1.4px solid #ECECEC; border-radius:12px; padding:12px 14px; margin:0 17px 2px; }
+  .dpointrow .l{ font-size:12px; font-weight:800; color:#161616; }
+  .dpointrow .s{ font-size:9.6px; color:#9a9a9a; margin-top:2px; }
+  .dswitch{ width:38px; height:22px; border-radius:11px; background:#E3E3E3; position:relative; cursor:pointer; flex:0 0 auto; transition:background .15s; }
+  .dswitch.on{ background:#E0142C; }
+  .dswitch .knob{ position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:left .15s; }
+  .dswitch.on .knob{ left:18px; }
+  .dpayicon{ width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:900; color:#fff; flex:0 0 auto; letter-spacing:.2px; }
+
+  .dnonmember{ margin:12px 17px 5px; background:#FFF8E1; border:1px solid #FFE49B; color:#8A6400; font-size:10.2px; border-radius:11px; padding:10px 12px; display:flex; gap:7px; line-height:1.55;}
+  .dnonmember.danger{ background:#FFF3F4; border-color:#FFD9DE; color:#8A1424;}
+  .dposters{ display:flex; gap:10px; padding:0 17px; overflow:hidden;}
+  .dposter{ width:86px; flex:0 0 auto;}
+  .dposter .img{ width:86px; height:122px; border-radius:10px; background:linear-gradient(160deg,#333,#000); position:relative;}
+  .dposter .rank{ position:absolute; top:5px; left:5px; background:#E0142C; color:#fff; font-size:9px; font-weight:800; padding:2px 5px; border-radius:5px;}
+  .dposter .title{ font-size:10.4px; font-weight:800; color:#161616; margin-top:5px;}
+  .dposter .sub{ font-size:8.8px; color:#9a9a9a; margin-top:1px;}
+  .dposter .rate{ font-size:8.6px; color:#E0142C; font-weight:800; margin-top:1px;}
+
+  .dchips{ display:flex; gap:7px; flex-wrap:wrap; padding:0 17px;}
+  button.dchip{ font-family:inherit; border:1px solid #ECECEC; background:#fff; border-radius:9px; padding:9px 10px; font-size:9.8px; color:#161616; font-weight:700; text-align:center; min-width:52px; cursor:pointer;}
+  button.dchip:hover{ border-color:#E0142C; }
+  .dchip .seat{ font-size:8.5px; color:#E0142C; font-weight:800; margin-top:2px;}
+
+  .dcurve{ margin:15px auto 2px; width:210px; height:22px; border-top:3px solid #B9C3D6;
+    border-radius:50%/22px 22px 0 0; background:radial-gradient(ellipse at 50% 0%, rgba(120,160,230,.22), rgba(120,160,230,0) 70%); }
+  .dscreen{ text-align:center; font-size:8px; color:#9aa3b2; letter-spacing:3px; margin-bottom:12px; font-weight:600;}
+  .dseatmap{ display:flex; flex-direction:column; align-items:center; gap:5px; padding:0 10px;}
+  .dseatrow{ display:flex; gap:5px; align-items:center;}
+  .drowlabel{ width:12px; font-size:7.5px; color:#B7B2A8; font-weight:700; text-align:center; flex:0 0 auto; }
+  button.dseat{ width:18px; height:16px; border-radius:4px 4px 6px 6px; background:#E8EAEE; border:1px solid #D7DBE2; padding:0; cursor:pointer; box-shadow: inset 0 -1.5px 0 rgba(0,0,0,.05);}
+  button.dseat.sel{ background:#E0142C; border-color:#B8102A; box-shadow:0 1px 4px rgba(224,20,44,.45);}
+  button.dseat.done{ background:#D8D4CC; border-color:#D8D4CC; cursor:default;}
+  .dseat.gap{ background:transparent; border-color:transparent; width:18px; height:16px;}
+  .dlegend{ display:flex; gap:12px; justify-content:center; margin-top:12px; font-size:8.3px; color:#8a8a8a;}
+  .dlegend span{ display:inline-flex; align-items:center; gap:4px;}
+  .dlegend i{ width:9px; height:9px; border-radius:2.5px; display:inline-block;}
+  .dlock{ margin:12px 17px 0; border:1px solid #FFD9DE; background:#FFF3F4; border-radius:10px; padding:10px 11px; font-size:9.6px; color:#8a1424; line-height:1.55;}
+
+  .ddim{ position:absolute; inset:0; background:rgba(10,10,10,.45); display:none; }
+  .ddim.show{ display:block; }
+  .dsheet{ position:absolute; left:0; right:0; bottom:-100%; background:#fff; border-radius:18px 18px 0 0; padding:19px 19px 24px; box-shadow:0 -10px 24px rgba(0,0,0,.18); transition: bottom .25s ease; }
+  .dsheet.show{ bottom:0; }
+  .dsheet .handle{ width:34px; height:4px; background:#E3E3E3; border-radius:2px; margin:0 auto 14px;}
+  .dsheet h3{ font-size:15px; font-weight:800; color:#161616; margin:0 0 7px; text-align:center;}
+  .dsheet p{ font-size:10.4px; color:#8a8a8a; text-align:center; line-height:1.6; margin:0 0 15px;}
+  button.dghost{ width:100%; text-align:center; padding:12px; border-radius:10px; font-weight:800; font-size:11.8px; color:#161616; background:#F3F3F3; margin-top:8px; border:0; cursor:pointer; font-family:inherit;}
+
+  .dbottomnav{ position:absolute; left:0; right:0; bottom:0; height:52px; background:#fff; border-top:1px solid #ECECEC; display:flex; align-items:center;}
+  button.dtab{ flex:1; text-align:center; font-size:8.3px; color:#B5B5B5; font-weight:700; background:none; border:0; cursor:pointer; font-family:inherit; padding:7px 0 5px;}
+  button.dtab.active{ color:#E0142C;}
+  button.dtab svg{ display:block; margin:0 auto 3px; width:19px; height:19px; stroke:#B5B5B5; fill:none; stroke-width:1.9; }
+  button.dtab.active svg{ stroke:#E0142C; }
+  .dcheckbig{ width:44px; height:44px; border-radius:50%; background:#E0142C; color:#fff; font-size:22px; font-weight:900; display:flex; align-items:center; justify-content:center; margin:0 auto 12px;}
+
+  .stepsub{ margin-top:14px; font-size:11px; color:var(--sub); text-align:center; max-width:280px; line-height:1.5; opacity:.85; }
+  .stepsub b{ color:var(--ink); font-weight:700; }
+
+  .dcontent.scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .dtabsrow{ display:flex; gap:7px; padding:11px 17px 3px; overflow:hidden; }
+  button.dpill{ font-family:inherit; border:0; border-radius:16px; padding:7px 12px; font-size:10px; font-weight:800; white-space:nowrap; background:#F1F1F1; color:#6b6b6b; cursor:pointer; }
+  button.dpill.active{ background:#161616; color:#fff; }
+  .dbellbadge{ position:absolute; top:-2px; right:-2px; min-width:14px; height:14px; padding:0 3px; border-radius:7px; background:#E0142C; color:#fff; font-size:8px; font-weight:800; display:none; align-items:center; justify-content:center; line-height:14px; }
+  .dbellbadge.show{ display:flex; }
+
+  .dprofile-row{ display:flex; align-items:center; justify-content:space-between; padding-top:6px; }
+  .davatar{ width:46px; height:46px; border-radius:50%; background:#EFEFEF; display:flex; align-items:center; justify-content:center; color:#B9B9B9; flex:0 0 auto; }
+  .davatar svg{ width:24px; height:24px; }
+  button.dloginlink{ display:flex; align-items:center; gap:5px; font-family:inherit; background:none; border:0; padding:14px 0 4px; font-size:19px; font-weight:900; color:#161616; cursor:pointer; text-align:left; }
+  .dloginlink span{ color:#B5B5B5; font-weight:700; font-size:16px; }
+  .dloginsub{ font-size:11px; color:#9a9a9a; padding-bottom:6px; }
+  .dusername{ font-size:16px; font-weight:900; color:#161616; }
+  .dgradelink{ font-size:10.5px; color:#9a9a9a; margin-top:3px; }
+  .dptbar{ height:8px; border-radius:4px; background:#F0F0F0; margin-top:14px; overflow:hidden; position:relative; }
+  .dptfill{ height:100%; min-width:46px; background:linear-gradient(90deg,#FF7A52,#E0142C); border-radius:4px 0 0 4px; display:flex; align-items:center; justify-content:flex-end; padding-right:6px; font-size:7.6px; font-weight:800; color:#fff; white-space:nowrap; }
+  .dptrange{ display:flex; justify-content:space-between; font-size:9.6px; color:#9a9a9a; margin-top:4px; }
+  .dpointcard{ background:#F7F7F7; border-radius:13px; padding:13px 14px; margin-top:14px; }
+  .dpcrow{ display:flex; align-items:center; gap:9px; }
+  .dpcicon{ width:22px; height:22px; border-radius:50%; background:conic-gradient(from 90deg,#8A5CFF,#FF5C8A,#FFC65C,#8A5CFF); flex:0 0 auto; }
+  .dpcname{ flex:1; font-size:12px; font-weight:800; color:#161616; }
+  .dpcval{ font-size:13px; font-weight:900; color:#161616; }
+  .dline-soft{ height:1px; background:#E6E6E6; margin:10px 0; }
+  .dpcstats{ display:flex; text-align:center; }
+  .dpcstats > div, .dpcstats > button.dpcstat-btn{ flex:1; }
+  button.dpcstat-btn{ font-family:inherit; background:none; border:0; padding:0; cursor:pointer; }
+  .dpcstats b{ display:block; font-size:13.5px; font-weight:900; color:#161616; margin-bottom:2px; }
+  .dpcstats span{ font-size:8.6px; color:#9a9a9a; }
+  .dchipsrow{ display:flex; gap:7px; overflow:hidden; margin-top:13px; }
+  .dchip2{ flex:0 0 auto; border:1px solid #ECECEC; border-radius:14px; padding:6px 10px; font-size:9.6px; color:#555; white-space:nowrap; }
+
+  .dgrid{ display:grid; grid-template-columns:1fr 1fr; gap:13px 10px; margin-top:4px; }
+  button.dgriditem{ font-family:inherit; text-align:left; background:none; border:0; padding:0; font-size:12.5px; font-weight:800; color:#161616; cursor:pointer; }
+
+  .dpromo{ display:flex; align-items:center; justify-content:space-between; background:linear-gradient(120deg,#7FF0C4,#4FD9A8); border-radius:13px; padding:14px; margin-top:16px; overflow:hidden; gap:8px; }
+  .dpromotxt .dpromodate{ font-size:9px; color:#0B4A35; font-weight:700; margin-bottom:3px; }
+  .dpromotxt .dpromotitle{ font-size:13px; font-weight:900; color:#0B2A1F; margin-bottom:8px; }
+  button.dpromobtn{ font-family:inherit; border:1.3px solid #0B2A1F; border-radius:12px; background:none; padding:5px 10px; font-size:9.3px; font-weight:800; color:#0B2A1F; cursor:pointer; }
+  .dpromoimg{ font-size:30px; flex:0 0 auto; }
+
+  .dloginfield{ width:100%; border:1.4px solid #E3E3E3; border-radius:10px; padding:13px 14px; font-size:12.5px; font-family:inherit; color:#161616; margin-top:7px; }
+  .dloginfield:focus{ outline:none; border-color:#E0142C; }
+  label.dautologin{ display:flex; align-items:center; gap:6px; justify-content:flex-end; font-size:10.3px; color:#555; margin-top:10px; }
+  .dloginlinks{ text-align:center; font-size:10.3px; color:#9a9a9a; margin-top:14px; }
+  .dloginlinks b{ color:#161616; }
+  .dsnsrow{ display:flex; justify-content:center; gap:14px; margin-top:4px; }
+  button.dsnsbtn{ width:38px; height:38px; border-radius:50%; border:0; font-size:15px; font-weight:800; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit; }
+  .dcaptcha{ display:flex; gap:8px; margin-top:12px; }
+  .dcaptchaimg{ flex:1; height:46px; border-radius:9px; background:repeating-linear-gradient(135deg,#F3F3F3,#F3F3F3 6px,#EAEAEA 6px,#EAEAEA 12px); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; letter-spacing:3px; color:#555; }
+  .dcaptchabtns{ display:flex; flex-direction:column; justify-content:center; gap:4px; font-size:8.6px; color:#555; text-align:center; width:48px; }
+
+  button.dtab.fab{ position:relative; }
+  .fabcircle{ position:absolute; top:-19px; left:50%; transform:translateX(-50%); width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,#FF4D5E,#E0142C); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(224,20,44,.45); }
+  button.dtab.fab .fabcircle svg{ stroke:#fff; width:18px; height:18px; }
+  button.dtab.fab .fablabel{ display:block; margin-top:22px; color:#E0142C; font-weight:800; }
+</style>
+
+<div class="page">
+
+  <div class="device">
+
+    <!-- 0 : 홈 (비로그인) -->
+    <div class="screen on" data-s="home">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar" style="justify-content:space-between; padding:0 14px;">
+        <div class="logo" style="margin:0;">CGV</div>
+        <div style="display:flex; align-items:center; gap:1px;">
+          <button class="iconbtn" aria-label="예매내역" onclick="go('mypage')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/></svg>
+          </button>
+          <button class="iconbtn" aria-label="알림" style="position:relative;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="dbellbadge" id="home-notidot">27</span>
+          </button>
+          <button class="iconbtn" aria-label="검색">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="dcontent scroll">
+        <div class="dtabsrow">
+          <button class="dpill active">영화</button>
+          <button class="dpill">이벤트/혜택</button>
+          <button class="dpill">KBO 포스트시즌</button>
+        </div>
+        <div class="qbcard">
+          <div class="qbtop"><div class="t">바로 예매</div><div class="a">전체 극장 ›</div></div>
+          <div class="qbrow">
+            <div class="qbcell"><div class="k">극장</div><div class="v">CGV 강남</div></div>
+            <div class="qbcell"><div class="k">날짜</div><div class="v">10.24(토)</div></div>
+            <div class="qbcell"><div class="k">영화</div><div class="v">극한의 예매</div></div>
+          </div>
+        </div>
+        <div class="dnonmember">👁 <div><b>비로그인 상태</b>에서도 상영시간표와 좌석 현황을 바로 볼 수 있어요.</div></div>
+        <div class="dsec-title" style="padding:12px 17px 7px;">무비차트 TOP 3</div>
+        <div class="dposters">
+          <div class="dposter"><div class="img"><div class="rank">1</div></div><div class="title">극한의 예매</div><div class="rate">예매율 42.3%</div></div>
+          <div class="dposter"><div class="img" style="background:linear-gradient(160deg,#5a2a2a,#1b0707);"><div class="rank">2</div></div><div class="title">좌석의 탄생</div><div class="rate">예매율 18.7%</div></div>
+          <div class="dposter"><div class="img" style="background:linear-gradient(160deg,#233a55,#0a1420);"><div class="rank">3</div></div><div class="title">기프티콘 다이어리</div><div class="rate">예매율 11.2%</div></div>
+        </div>
+        <div class="dsec-title" style="padding:14px 17px 7px;">극한의 예매 · 오늘 상영시간</div>
+        <div class="dchips">
+          <button class="dchip" onclick="goSeat()">14:20<div class="seat">잔여 8</div></button>
+          <button class="dchip" onclick="goSeat()">16:50<div class="seat">잔여 22</div></button>
+          <button class="dchip" onclick="goSeat()">19:40<div class="seat">잔여 14</div></button>
+          <button class="dchip" onclick="goSeat()">22:10<div class="seat">잔여 31</div></button>
+        </div>
+      </div>
+      <div class="dbottomnav">
+        <button class="dtab active"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>홈</button>
+        <button class="dtab"><svg viewBox="0 0 24 24"><circle cx="9" cy="10" r="6"/><circle cx="15" cy="14" r="6"/></svg>씨네톡</button>
+        <button class="dtab fab" onclick="goSeat()">
+          <span class="fabcircle"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/></svg></span>
+          <span class="fablabel">예매·예약</span>
+        </button>
+        <button class="dtab"><svg viewBox="0 0 24 24"><path d="M6 9h12l-1.3 11.2a2 2 0 0 1-2 1.8h-5.4a2 2 0 0 1-2-1.8L6 9z"/><path d="M7 9c0-2.8 2.2-5 5-5s5 2.2 5 5"/></svg>매점</button>
+        <button class="dtab" onclick="go('mypage')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 21c1.3-4.2 4.4-6.2 7.5-6.2s6.2 2 7.5 6.2"/></svg>더보기</button>
+      </div>
+    </div>
+
+    <!-- 1 : 마이페이지 -->
+    <div class="screen" data-s="mypage">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar" style="justify-content:flex-end; padding:0 14px;">
+        <button class="iconbtn" aria-label="예매내역">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/></svg>
+        </button>
+        <button class="iconbtn" aria-label="알림" style="position:relative;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="dbellbadge" id="my-notidot">27</span>
+        </button>
+        <button class="iconbtn" aria-label="검색">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        </button>
+      </div>
+      <div class="dcontent scroll"><div class="dpad" style="padding-bottom:28px;">
+
+        <!-- 비로그인 -->
+        <div id="my-guest">
+          <div class="dprofile-row">
+            <div class="davatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.6-4.2 5-6.2 8-6.2s6.4 2 8 6.2"/></svg></div>
+          </div>
+          <button class="dloginlink" onclick="go('login')">로그인 <span>›</span></button>
+          <div class="dloginsub">로그인하고 다양한 서비스와 혜택을 이용하세요.</div>
+        </div>
+
+        <!-- 로그인 상태 -->
+        <div id="my-member" style="display:none;">
+          <div class="dprofile-row">
+            <div>
+              <div class="dusername">즐거운보핍1904 님</div>
+              <div class="dgradelink">내 등급 보러 가기 ›</div>
+            </div>
+            <div class="davatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.6-4.2 5-6.2 8-6.2s6.4 2 8 6.2"/></svg></div>
+          </div>
+          <div class="dptbar"><div class="dptfill" style="width:9%;">670점</div></div>
+          <div class="dptrange"><span>일반</span><span>10,000점</span></div>
+          <div class="dpointcard">
+            <div class="dpcrow"><div class="dpcicon"></div><div class="dpcname">CJ ONE Point</div><div class="dpcval">1,064P</div></div>
+            <div class="dline-soft"></div>
+            <div class="dpcstats">
+              <div><b>2</b><span>쿠폰</span></div>
+              <button class="dpcstat-btn" onclick="go('giftbox')"><b id="my-gift-stat">0</b><span>관람/기프트콘</span></button>
+              <div><b>0</b><span>기간회수권</span></div>
+              <div><b>⎙</b><span>기프트카드</span></div>
+            </div>
+          </div>
+          <div class="dchipsrow">
+            <span class="dchip2">자주 찾는 질문 ✕</span>
+            <span class="dchip2">내가 본 영화 ✕</span>
+            <span class="dchip2">롤롤 ✕</span>
+          </div>
+        </div>
+
+        <div class="dline" style="margin:18px 0 12px;"></div>
+        <div class="dsec-title">나의 정보 관리</div>
+        <div class="dgrid">
+          <button class="dgriditem">내가 본 영화</button>
+          <button class="dgriditem">보관함</button>
+          <button class="dgriditem">스마트결제관리</button>
+          <button class="dgriditem" onclick="go('history')">예약/결제내역</button>
+          <button class="dgriditem">내 차량번호 조회</button>
+          <button class="dgriditem">자주가는 CGV</button>
+        </div>
+
+        <div class="dpromo">
+          <div class="dpromotxt">
+            <div class="dpromodate">10월 21일 대개봉 / 12세 관람가</div>
+            <div class="dpromotitle">K-히어로 스틸레이</div>
+            <button class="dpromobtn">자세히보기</button>
+          </div>
+          <div class="dpromoimg">🤖</div>
+        </div>
+
+      </div></div>
+      <div class="dbottomnav">
+        <button class="dtab" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>홈</button>
+        <button class="dtab"><svg viewBox="0 0 24 24"><circle cx="9" cy="10" r="6"/><circle cx="15" cy="14" r="6"/></svg>씨네톡</button>
+        <button class="dtab fab" onclick="goSeat()">
+          <span class="fabcircle"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/></svg></span>
+          <span class="fablabel">예매·예약</span>
+        </button>
+        <button class="dtab"><svg viewBox="0 0 24 24"><path d="M6 9h12l-1.3 11.2a2 2 0 0 1-2 1.8h-5.4a2 2 0 0 1-2-1.8L6 9z"/><path d="M7 9c0-2.8 2.2-5 5-5s5 2.2 5 5"/></svg>매점</button>
+        <button class="dtab active"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 21c1.3-4.2 4.4-6.2 7.5-6.2s6.2 2 7.5 6.2"/></svg>더보기</button>
+      </div>
+    </div>
+
+    <!-- 1c : 기프티콘함 -->
+    <div class="screen" data-s="giftbox">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar"><button class="back" onclick="go('mypage')">‹</button><div class="title">관람권 · 기프티콘</div></div>
+      <div class="dcontent scroll"><div class="dpad">
+        <div class="dtoast" id="toast-register"><div class="c">✓</div><div>기프티콘이 등록되었습니다. 결제할 때 코드 입력 없이 바로 선택해 사용할 수 있어요.</div></div>
+        <button class="dadd" onclick="go('register')">+ 기프티콘 등록하기</button>
+        <div class="dsec-title" style="margin-top:16px;">보유 중인 기프티콘<span class="count" id="gift-count">2장</span></div>
+        <div class="dgift" id="gift-A"><div class="left"><div class="dgicon">CGV</div>
+          <div><div class="dgname">CGV 영화관람권<span class="dusedbadge" id="gift-A-badge" style="display:none;">사용완료</span></div><div class="dgsub" id="gift-A-sub">카카오톡 선물하기 · 2026.12.31</div></div></div>
+          <div class="dgamt" id="gift-A-amt">14,000원</div></div>
+        <div class="dgift" id="gift-B"><div class="left"><div class="dgicon">₩</div>
+          <div><div class="dgname">CGV 금액권<span class="dusedbadge" id="gift-B-badge" style="display:none;">사용완료</span></div><div class="dgsub" id="gift-B-sub">카카오톡 선물하기 · 2027.03.15</div></div></div>
+          <div class="dgamt" id="gift-B-amt">10,000원</div></div>
+        <div class="dgift" id="gift-C" style="display:none;"><div class="left"><div class="dgicon">★</div>
+          <div><div class="dgname">CGV 금액권<span class="dnew" id="gift-C-new">NEW</span><span class="dusedbadge" id="gift-C-badge" style="display:none;">사용완료</span></div><div class="dgsub" id="gift-C-sub">방금 등록 · 2028.01.20</div></div></div>
+          <div class="dgamt" id="gift-C-amt">5,000원</div></div>
+        <div class="dinfo">한 번 등록해두면 결제할 때 코드를 다시 입력하지 않아도, 목록에서 바로 선택해 사용할 수 있어요. 결제에 사용한 기프티콘은 <b>사용완료</b>로 표시돼요.</div>
+      </div></div>
+    </div>
+
+    <!-- 1d : 예매내역 -->
+    <div class="screen" data-s="history">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar"><button class="back" onclick="go('mypage')">‹</button><div class="title">예매/결제내역</div></div>
+      <div class="dcontent scroll"><div class="dpad" id="history-list">
+        <div class="demptyhist">아직 예매 내역이 없어요.<br>영화를 예매하면 여기에 표시돼요.</div>
+      </div></div>
+    </div>
+
+    <!-- 1b : 로그인 -->
+    <div class="screen" data-s="login">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar"><button class="back" onclick="go('mypage')">‹</button><div class="title">로그인</div></div>
+      <div class="dcontent scroll"><div class="dpad" style="padding-top:22px; padding-bottom:30px;">
+        <div style="text-align:center; margin-bottom:24px;">
+          <div class="logo" style="font-size:30px; display:inline-block; margin:0;">CGV</div>
+        </div>
+        <input class="dloginfield" style="margin-top:0;" placeholder="CJ ONE 통합 아이디 6~12자">
+        <input class="dloginfield" placeholder="영문+숫자+특수문자 6~12자" type="password">
+        <label class="dautologin"><input type="checkbox" checked style="accent-color:#E0142C;"> 자동 로그인</label>
+        <div class="dcaptcha">
+          <div class="dcaptchaimg">065762</div>
+          <div class="dcaptchabtns"><span>↻ 새로고침</span><span>🔊 음성듣기</span></div>
+        </div>
+        <input class="dloginfield" placeholder="자동입력 방지문자 입력">
+        <button class="dbtn" style="margin-top:16px;" onclick="doLogin()">로그인</button>
+        <div class="dloginlinks">아이디 찾기 &nbsp;|&nbsp; 비밀번호 찾기 &nbsp;|&nbsp; <b>CJ ONE 통합회원가입</b></div>
+        <div class="dline" style="margin:20px 0 14px;"></div>
+        <div class="dsnsrow">
+          <button class="dsnsbtn" style="background:#03C75A;" onclick="doLogin()">N</button>
+          <button class="dsnsbtn" style="background:#FEE500; color:#3C1E1E;" onclick="doLogin()">talk</button>
+          <button class="dsnsbtn" style="background:#161616;" onclick="doLogin()"></button>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- 2 : 기프티콘 등록 -->
+    <div class="screen" data-s="register">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar"><button class="back" onclick="go('giftbox')">‹</button><div class="title">기프티콘 등록</div></div>
+      <div class="dcontent"><div class="dpad">
+        <div class="dinput-label">쿠폰번호 입력</div>
+        <div class="dinput">5678 - 1234 - 0098</div>
+        <div class="dhint">카카오톡 선물하기로 받은 기프티콘의 쿠폰번호 16자리를 입력해 주세요.<br><b>유효기간·중복 사용 여부는 등록 즉시 자동으로 확인돼요.</b></div>
+        <div class="dcheck"><div class="c">✓</div><div>코드 형식이 올바릅니다. 등록하기를 누르면 기프티콘함에 저장돼요.</div></div>
+      </div></div>
+      <div class="dcta"><button class="dbtn" onclick="registerGift()">등록하기</button></div>
+    </div>
+
+    <!-- 3 : 좌석 선택 (비회원, 열람만) -->
+    <div class="screen" data-s="seatview">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar"><button class="back" onclick="go('home')">‹</button><div class="title">좌석 선택</div></div>
+      <div class="dcontent">
+        <div class="dpad" style="padding-bottom:0;">
+          <div style="font-size:13.5px; font-weight:800; color:#161616;">극한의 예매 (12세 이상)</div>
+          <div style="font-size:10.2px; color:#9a9a9a; margin-top:2px;">CGV 강남 · 3관 · 2D · 10/24(토) 19:40 · 잔여 14석</div>
+        </div>
+        <div class="dnonmember danger">👁 비회원도 좌석 현황을 볼 수 있어요. 좌석을 <b>선택</b>하려면 로그인이 필요해요.</div>
+        <div class="dcurve"></div><div class="dscreen">S C R E E N</div>
+        <div class="dseatmap">
+          <div class="dseatrow"><span class="drowlabel">A</span><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat done" disabled></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><div class="dseat gap"></div><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button></div>
+          <div class="dseatrow"><span class="drowlabel">B</span><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat done" disabled></button><button class="dseat done" disabled></button><div class="dseat gap"></div><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button></div>
+          <div class="dseatrow"><span class="drowlabel">C</span><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><div class="dseat gap"></div><button class="dseat" onclick="openSheet()"></button><button class="dseat" onclick="openSheet()"></button><button class="dseat done" disabled></button><button class="dseat" onclick="openSheet()"></button></div>
+        </div>
+        <div class="dlegend"><span><i style="background:#E3E6EA;"></i>선택 가능</span><span><i style="background:#D5D5D5;"></i>예매 완료</span></div>
+        <div class="dlock">🔒 좌석 배치와 잔여석은 누구나 볼 수 있지만, <b>실제 좌석 선택</b>은 로그인 후 진행할 수 있어요.</div>
+      </div>
+      <div class="dcta"><button class="dbtn" onclick="openSheet()">로그인하고 좌석 선택하기</button></div>
+      <div class="ddim" id="sheet-dim" onclick="closeSheet()"></div>
+      <div class="dsheet" id="sheet-login">
+        <div class="handle"></div>
+        <h3>로그인이 필요해요</h3>
+        <p>좌석을 선택하고 예매를 진행하려면<br>로그인(또는 휴대폰 본인인증)이 필요합니다.<br>지금까지 확인한 좌석 현황은 그대로 유지돼요.</p>
+        <button class="dbtn" onclick="loginAndGo('seatselect')">전화번호로 간편 로그인</button>
+        <button class="dghost" onclick="loginAndGo('seatselect')">카카오 · 네이버로 로그인</button>
+      </div>
+    </div>
+
+    <!-- 4 : 좌석 선택 (로그인 후) -->
+    <div class="screen" data-s="seatselect">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar"><button class="back" onclick="goSeatBack()">‹</button><div class="title">좌석 선택</div></div>
+      <div class="dcontent">
+        <div class="dpad" style="padding-bottom:0;">
+          <div style="font-size:13.5px; font-weight:800; color:#161616;">극한의 예매 (12세 이상)</div>
+          <div style="font-size:10.2px; color:#9a9a9a; margin-top:2px;">CGV 강남 · 3관 · 2D · 10/24(토) 19:40</div>
+        </div>
+        <div class="dinfo" style="background:#FFF0F2; color:#E0142C; margin:9px 17px 0;">로그인 완료 · 좌석을 눌러 직접 선택해 보세요</div>
+        <div class="dcurve"></div><div class="dscreen">S C R E E N</div>
+        <div class="dseatmap" id="seatmap">
+          <div class="dseatrow"><span class="drowlabel">A</span><button class="dseat" data-label="A1" onclick="toggleSeat(this)"></button><button class="dseat" data-label="A2" onclick="toggleSeat(this)"></button><button class="dseat done" disabled></button><button class="dseat" data-label="A4" onclick="toggleSeat(this)"></button><button class="dseat" data-label="A5" onclick="toggleSeat(this)"></button><div class="dseat gap"></div><button class="dseat" data-label="A6" onclick="toggleSeat(this)"></button><button class="dseat" data-label="A7" onclick="toggleSeat(this)"></button><button class="dseat" data-label="A8" onclick="toggleSeat(this)"></button><button class="dseat" data-label="A9" onclick="toggleSeat(this)"></button></div>
+          <div class="dseatrow"><span class="drowlabel">B</span><button class="dseat" data-label="B1" onclick="toggleSeat(this)"></button><button class="dseat" data-label="B2" onclick="toggleSeat(this)"></button><button class="dseat" data-label="B3" onclick="toggleSeat(this)"></button><button class="dseat done" disabled></button><button class="dseat done" disabled></button><div class="dseat gap"></div><button class="dseat" data-label="B6" onclick="toggleSeat(this)"></button><button class="dseat" data-label="B7" onclick="toggleSeat(this)"></button><button class="dseat" data-label="B8" onclick="toggleSeat(this)"></button><button class="dseat" data-label="B9" onclick="toggleSeat(this)"></button></div>
+          <div class="dseatrow"><span class="drowlabel">C</span><button class="dseat" data-label="C1" onclick="toggleSeat(this)"></button><button class="dseat" data-label="C2" onclick="toggleSeat(this)"></button><button class="dseat" data-label="C3" onclick="toggleSeat(this)"></button><button class="dseat" data-label="C4" onclick="toggleSeat(this)"></button><button class="dseat" data-label="C5" onclick="toggleSeat(this)"></button><div class="dseat gap"></div><button class="dseat" data-label="C6" onclick="toggleSeat(this)"></button><button class="dseat" data-label="C7" onclick="toggleSeat(this)"></button><button class="dseat done" disabled></button><button class="dseat" data-label="C9" onclick="toggleSeat(this)"></button></div>
+        </div>
+        <div class="dlegend"><span><i style="background:#E3E6EA;"></i>선택 가능</span><span><i style="background:#E0142C;"></i>선택됨</span><span><i style="background:#D5D5D5;"></i>예매 완료</span></div>
+      </div>
+      <div class="dcta"><button class="dbtn disabled" id="seatbtn" disabled onclick="go('payment')">좌석을 선택해 주세요</button></div>
+    </div>
+
+    <!-- 5 : 결제 -->
+    <div class="screen" data-s="payment">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar"><button class="back" onclick="go('seatselect')">‹</button><div class="title">결제</div></div>
+      <div class="dcontent scroll" style="padding-bottom:78px;">
+        <div class="dmovie"><div class="name">극한의 예매 (12세 이상)</div><div class="meta" id="pay-meta">CGV 강남 · 3관 · 2D · 10/24(토) 19:40 · <span id="pay-seats">D6</span></div></div>
+        <div class="dsec-title" style="padding:11px 17px 5px;">기프티콘함에서 선택</div>
+        <button class="dselect active" id="optA" onclick="selectGift('A')"><div class="dradio"></div>
+          <div style="flex:1;"><div class="dgname">CGV 영화관람권<span class="dbadge">BEST</span></div><div class="dgsub">유효기간 2026.12.31</div></div>
+          <div class="dgamt" style="color:#E0142C;">-14,000원</div></button>
+        <button class="dselect" id="optB" onclick="selectGift('B')"><div class="dradio"></div>
+          <div style="flex:1;"><div class="dgname">CGV 금액권</div><div class="dgsub">유효기간 2027.03.15</div></div>
+          <div class="dgamt">-10,000원</div></button>
+        <button class="dselect" id="optC" style="display:none;" onclick="selectGift('C')"><div class="dradio"></div>
+          <div style="flex:1;"><div class="dgname">CGV 금액권<span class="dnew">NEW</span></div><div class="dgsub">방금 등록한 기프티콘</div></div>
+          <div class="dgamt">-5,000원</div></button>
+        <div class="dapplied">✓ 코드 재입력 없이 선택만으로 결제 금액에 자동 반영됩니다 — 옵션을 눌러 바꿔보세요</div>
+
+        <div class="dsec-title" style="padding:16px 17px 5px;">포인트 사용</div>
+        <button class="dselect" id="pointOpt" onclick="togglePoint()"><div class="dradio"></div>
+          <div style="flex:1;"><div class="dgname">CJ ONE 포인트</div><div class="dgsub">보유 1,064P · 남은 결제 금액 내에서 전액 사용</div></div>
+          <div class="dgamt" id="pointAmtLabel" style="color:#E0142C;">-0원</div></button>
+
+        <div class="dsec-title" style="padding:16px 17px 5px;">결제 카드</div>
+        <button class="dselect active" id="cardA" onclick="selectCard('A')"><div class="dradio"></div>
+          <div style="flex:1;"><div class="dgname">신한카드<span class="dbadge">기본카드</span></div><div class="dgsub">**** **** **** 1234</div></div></button>
+        <button class="dselect" id="cardB" onclick="selectCard('B')"><div class="dradio"></div>
+          <div style="flex:1;"><div class="dgname">KB국민카드</div><div class="dgsub">**** **** **** 5678</div></div></button>
+
+        <div class="dline" style="margin-top:14px;"></div>
+        <div class="dprice"><div class="label">좌석 금액</div><div class="value" id="base-amt">14,000원</div></div>
+        <div class="dprice"><div class="label">기프티콘 할인</div><div class="value" id="discount" style="color:#E0142C;">-14,000원</div></div>
+        <div class="dprice"><div class="label">포인트 사용</div><div class="value" id="point-use" style="color:#E0142C;">-0원</div></div>
+        <div class="dprice total"><div class="label" id="total-label" style="font-weight:800; color:#161616;">신한카드 결제 금액</div><div class="value" id="total">0원</div></div>
+      </div>
+      <div class="dcta"><button class="dbtn" id="paybtn" onclick="completeBooking()">0원 결제하기</button></div>
+    </div>
+
+    <!-- 6 : 완료 -->
+    <div class="screen" data-s="complete">
+      <div class="dstatus"><span>9:41</span><span>Wi-Fi 87%</span></div>
+      <div class="dappbar"><button class="back" onclick="go('history')">‹</button><div class="title">예매 완료</div></div>
+      <div class="dcontent"><div class="dpad" style="padding-top:24px;">
+        <div style="text-align:center; margin-bottom:16px;">
+          <div class="dcheckbig">✓</div>
+          <div style="font-size:14.5px; font-weight:800; color:#161616;">예매가 완료되었습니다</div>
+        </div>
+        <div class="dgift" style="background:#FAFAFA;"><div class="left"><div class="dgicon">CGV</div>
+          <div><div class="dgname">극한의 예매</div><div class="dgsub" id="done-seats">10/24(토) 19:40 · 3관 · D6</div></div></div></div>
+        <div class="dsec-title" style="margin-top:13px;">결제 내역</div>
+        <div class="dprice" style="padding-left:0; padding-right:0;"><div class="label">좌석 금액</div><div class="value" id="done-base">14,000원</div></div>
+        <div class="dprice" style="padding-left:0; padding-right:0;"><div class="label" id="done-giftlabel">CGV 영화관람권 사용</div><div class="value" id="done-giftamt" style="color:#E0142C;">-14,000원</div></div>
+        <div class="dprice" style="padding-left:0; padding-right:0;"><div class="label">포인트 사용</div><div class="value" id="done-point" style="color:#E0142C;">-0원</div></div>
+        <div class="dprice" style="padding-left:0; padding-right:0;"><div class="label" id="done-cashlabel">신한카드 결제</div><div class="value" id="done-cash">0원</div></div>
+        <div class="dinfo">사용한 기프티콘은 기프티콘함에서 <b>'사용 완료'</b>로 표시되고, 예매 내역에도 사용 내역이 함께 기록됩니다.</div>
+        <button class="dadd" style="margin-top:15px;" onclick="go('history')">돌아가기 · 예매내역에서 확인하기</button>
+      </div></div>
+    </div>
+
+  </div>
+
+  <div id="hint" style="display:none;"></div>
+
+  <button class="dresetbtn" onclick="resetAll()">처음으로 가기</button>
+
+</div>
+
+<script>
+  var registered = false;
+  var loggedIn = false;
+  var seatBase = { A4:14000 }; // default base price per seat for demo purposes
+  var SEAT_PRICE = 14000;
+
+  var HINTS = {
+    home: "상영시간 → 좌석 조회, <b>더보기</b> → 마이페이지",
+    login: "아무 버튼이나 눌러 로그인해 보세요.",
+    giftbox: "<b>+ 기프티콘 등록하기</b>로 등록해 보세요.",
+    register: "<b>등록하기</b>를 눌러보세요.",
+    seatview: "좌석을 누르면 로그인 안내가 떠요.",
+    seatselect: "좌석을 선택한 뒤 결제로 진행하세요.",
+    payment: "기프티콘·포인트·카드를 선택해 보세요.",
+    complete: "<b>돌아가기</b> → 예매내역에서 확인",
+    history: "사용한 기프티콘은 '사용완료'로 표시돼요."
+  };
+
+  function setLoggedIn(v){
+    loggedIn = v;
+    document.getElementById('my-guest').style.display = v ? 'none' : 'block';
+    document.getElementById('my-member').style.display = v ? 'block' : 'none';
+    ['home-notidot','my-notidot'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el){ el.classList.toggle('show', v); }
+    });
+    var gs = document.getElementById('my-gift-stat');
+    if(gs){ gs.textContent = registered ? '3' : '2'; }
+  }
+  function doLogin(){ setLoggedIn(true); go('mypage'); }
+  function loginAndGo(dest){ setLoggedIn(true); go(dest); }
+  function goSeat(){ go(loggedIn ? 'seatselect' : 'seatview'); }
+  function goSeatBack(){ go(loggedIn ? 'home' : 'seatview'); }
+
+  function go(s){
+    document.querySelectorAll('.screen').forEach(function(el){
+      el.classList.toggle('on', el.getAttribute('data-s') === s);
+    });
+    var hint = HINTS[s] || '';
+    if(s === 'mypage'){
+      hint = loggedIn
+        ? "<b>관람/기프트콘</b>에서 기프티콘을 확인해 보세요."
+        : "<b>로그인</b>을 누르면 더 많은 정보를 볼 수 있어요.";
+    }
+    document.getElementById('hint').innerHTML = hint;
+    if(s === 'payment'){ refreshPayment(); }
+  }
+
+  function openSheet(){
+    document.getElementById('sheet-dim').classList.add('show');
+    document.getElementById('sheet-login').classList.add('show');
+  }
+  function closeSheet(){
+    document.getElementById('sheet-dim').classList.remove('show');
+    document.getElementById('sheet-login').classList.remove('show');
+  }
+
+  function registerGift(){
+    registered = true;
+    document.getElementById('gift-C').style.display = 'flex';
+    document.getElementById('gift-count').textContent = '3장';
+    document.getElementById('toast-register').classList.add('show');
+    var gs = document.getElementById('my-gift-stat');
+    if(gs){ gs.textContent = '3'; }
+    go('giftbox');
+  }
+
+  var selectedSeats = [];
+  function toggleSeat(el){
+    el.classList.toggle('sel');
+    selectedSeats = Array.prototype.slice.call(document.querySelectorAll('#seatmap .dseat.sel'))
+      .map(function(e){ return e.getAttribute('data-label'); });
+    var btn = document.getElementById('seatbtn');
+    if(selectedSeats.length === 0){
+      btn.textContent = '좌석을 선택해 주세요';
+      btn.classList.add('disabled'); btn.disabled = true;
+    } else {
+      btn.textContent = selectedSeats.join(', ') + ' 선택 완료 (' + selectedSeats.length + '석)';
+      btn.classList.remove('disabled'); btn.disabled = false;
+    }
+  }
+
+  var giftChoice = 'A';
+  var GIFTS = { A: {label:'CGV 영화관람권', amt:14000}, B: {label:'CGV 금액권', amt:10000}, C: {label:'CGV 금액권', amt:5000}, NONE: {label:'기프티콘 미사용', amt:0} };
+  var usedGifts = { A:false, B:false, C:false };
+  var pointOn = false;
+  var POINT_BALANCE = 1064;
+  var cardChoice = 'A';
+  var CARDS = { A: '신한카드', B: 'KB국민카드' };
+  var bookings = [];
+
+  function availableGiftKeys(){
+    return ['A','B','C'].filter(function(k){
+      if(k === 'C' && !registered) return false;
+      if(usedGifts[k]) return false;
+      return true;
+    });
+  }
+
+  function selectGift(which){
+    giftChoice = which;
+    refreshPayment();
+  }
+
+  function togglePoint(){
+    pointOn = !pointOn;
+    refreshPayment();
+  }
+
+  function selectCard(which){
+    cardChoice = which;
+    refreshPayment();
+  }
+
+  function markGiftUsed(key){
+    var card = document.getElementById('gift-'+key);
+    if(card){ card.classList.add('used'); }
+    var badge = document.getElementById('gift-'+key+'-badge');
+    if(badge){ badge.style.display = 'inline-block'; }
+    var newBadge = document.getElementById('gift-'+key+'-new');
+    if(newBadge){ newBadge.style.display = 'none'; }
+  }
+
+  function refreshPayment(){
+    var avail = availableGiftKeys();
+    if(giftChoice !== 'NONE' && avail.indexOf(giftChoice) === -1){
+      giftChoice = avail.length ? avail[0] : 'NONE';
+    }
+    ['A','B','C'].forEach(function(k){
+      var el = document.getElementById('opt'+k);
+      if(!el) return;
+      var isAvail = avail.indexOf(k) !== -1;
+      el.style.display = isAvail ? 'flex' : 'none';
+      el.classList.toggle('active', isAvail && k === giftChoice);
+    });
+    document.getElementById('pointOpt').classList.toggle('active', pointOn);
+    ['A','B'].forEach(function(k){
+      document.getElementById('card'+k).classList.toggle('active', k === cardChoice);
+    });
+
+    var seatCount = Math.max(selectedSeats.length, 1);
+    var base = SEAT_PRICE * seatCount;
+    var seatLabel = selectedSeats.length ? selectedSeats.join(', ') : 'D6';
+    document.getElementById('pay-seats').textContent = seatLabel;
+    document.getElementById('base-amt').textContent = base.toLocaleString() + '원';
+
+    var g = GIFTS[giftChoice];
+    var giftDiscount = Math.min(g.amt, base);
+    var afterGift = base - giftDiscount;
+    var pointUse = pointOn ? Math.min(POINT_BALANCE, afterGift) : 0;
+    var total = afterGift - pointUse;
+    var cardName = CARDS[cardChoice];
+
+    document.getElementById('discount').textContent = '-' + giftDiscount.toLocaleString() + '원';
+    document.getElementById('point-use').textContent = '-' + pointUse.toLocaleString() + '원';
+    document.getElementById('pointAmtLabel').textContent = '-' + pointUse.toLocaleString() + '원';
+    document.getElementById('total').textContent = total.toLocaleString() + '원';
+    document.getElementById('total-label').textContent = cardName + ' 결제 금액';
+    document.getElementById('paybtn').textContent = total.toLocaleString() + '원 ' + cardName + '로 결제하기';
+
+    document.getElementById('done-seats').textContent = '10/24(토) 19:40 · 3관 · ' + seatLabel;
+    document.getElementById('done-base').textContent = base.toLocaleString() + '원';
+    document.getElementById('done-giftlabel').textContent = g.label + (giftDiscount>0 ? ' 사용' : '');
+    document.getElementById('done-giftamt').textContent = '-' + giftDiscount.toLocaleString() + '원';
+    document.getElementById('done-point').textContent = '-' + pointUse.toLocaleString() + '원';
+    document.getElementById('done-cashlabel').textContent = cardName + ' 결제';
+    document.getElementById('done-cash').textContent = total.toLocaleString() + '원';
+  }
+
+  function renderHistory(){
+    var wrap = document.getElementById('history-list');
+    if(!bookings.length){
+      wrap.innerHTML = '<div class="demptyhist">아직 예매 내역이 없어요.<br>영화를 예매하면 여기에 표시돼요.</div>';
+      return;
+    }
+    wrap.innerHTML = bookings.map(function(b){
+      var giftRow = b.giftAmt > 0 ? ('<div class="row"><span>'+b.giftLabel+' 사용</span><span>-'+b.giftAmt.toLocaleString()+'원</span></div>') : '';
+      var pointRow = b.pointAmt > 0 ? ('<div class="row"><span>포인트 사용</span><span>-'+b.pointAmt.toLocaleString()+'원</span></div>') : '';
+      return '<div class="dhistcard">'
+        + '<div class="top"><div class="name">극한의 예매</div><div class="badge">결제완료</div></div>'
+        + '<div class="meta">CGV 강남 · 3관 · 2D · 10/24(토) 19:40 · ' + b.seats + '</div>'
+        + '<div class="row"><span>좌석 금액</span><span>' + b.base.toLocaleString() + '원</span></div>'
+        + giftRow + pointRow
+        + '<div class="row total"><span>' + b.cardName + ' 결제</span><span>' + b.total.toLocaleString() + '원</span></div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function completeBooking(){
+    var seatCount = Math.max(selectedSeats.length, 1);
+    var base = SEAT_PRICE * seatCount;
+    var seatLabel = selectedSeats.length ? selectedSeats.join(', ') : 'D6';
+    var g = GIFTS[giftChoice];
+    var giftDiscount = Math.min(g.amt, base);
+    var afterGift = base - giftDiscount;
+    var pointUse = pointOn ? Math.min(POINT_BALANCE, afterGift) : 0;
+    var total = afterGift - pointUse;
+    var cardName = CARDS[cardChoice];
+
+    if(giftChoice !== 'NONE' && giftDiscount > 0){
+      usedGifts[giftChoice] = true;
+      markGiftUsed(giftChoice);
+    }
+
+    bookings.unshift({
+      seats: seatLabel, base: base,
+      giftLabel: g.label, giftAmt: giftDiscount,
+      pointAmt: pointUse, cardName: cardName, total: total
+    });
+    renderHistory();
+
+    go('complete');
+  }
+
+  function resetAll(){
+    document.querySelectorAll('#seatmap .dseat.sel').forEach(function(e){ e.classList.remove('sel'); });
+    selectedSeats = [];
+    pointOn = false;
+    cardChoice = 'A';
+    usedGifts = { A:false, B:false, C:false };
+    ['A','B','C'].forEach(function(k){
+      var card = document.getElementById('gift-'+k);
+      if(card){ card.classList.remove('used'); }
+      var badge = document.getElementById('gift-'+k+'-badge');
+      if(badge){ badge.style.display = 'none'; }
+    });
+    registered = false;
+    document.getElementById('gift-C').style.display = 'none';
+    var cNew = document.getElementById('gift-C-new');
+    if(cNew){ cNew.style.display = 'inline-block'; }
+    document.getElementById('gift-count').textContent = '2장';
+    document.getElementById('toast-register').classList.remove('show');
+    bookings = [];
+    renderHistory();
+    giftChoice = 'A';
+    refreshPayment();
+    setLoggedIn(false);
+    go('home');
+  }
+</script>
